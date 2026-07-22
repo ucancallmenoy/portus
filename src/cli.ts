@@ -16,6 +16,11 @@ cli.command("init", "Initialize a Docker project").action(async () => {
 
   console.log();
   console.log(chalk.bold("Package manager:"), result.packageManager);
+  console.log(
+    chalk.bold("Runtime:"),
+    `${result.runtime.runtime} ${result.runtime.nodeVersion}`,
+    chalk.dim(`(${result.runtime.source})`),
+  );
   console.log(chalk.bold("Monorepo:"), result.monorepo.isMonorepo ? "yes" : "no");
 
   if (result.monorepo.isMonorepo) {

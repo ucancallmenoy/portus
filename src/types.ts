@@ -1,5 +1,15 @@
 export type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
 
+export type Runtime = "node" | "bun";
+
+export type RuntimeSource = "engines" | "nvmrc" | "node-version" | "default";
+
+export interface RuntimeInfo {
+  runtime: Runtime;
+  nodeVersion: string;
+  source: RuntimeSource;
+}
+
 export type FrameworkCategory = "frontend" | "backend" | "fullstack" | "static";
 
 export interface FrameworkRule {
@@ -44,5 +54,6 @@ export interface MonorepoInfo {
 export interface ScanResult {
   root: string;
   packageManager: PackageManager;
+  runtime: RuntimeInfo;
   monorepo: MonorepoInfo;
 }
