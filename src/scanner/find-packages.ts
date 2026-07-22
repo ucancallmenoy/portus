@@ -13,6 +13,7 @@ async function readPackageInfo(
       name?: string;
       dependencies?: Record<string, string>;
       devDependencies?: Record<string, string>;
+      scripts?: Record<string, string>;
     };
     const packageDir = dirname(packageJsonPath);
     return {
@@ -21,6 +22,7 @@ async function readPackageInfo(
       packageJsonPath,
       dependencies: raw.dependencies ?? {},
       devDependencies: raw.devDependencies ?? {},
+      scripts: raw.scripts ?? {},
       isRoot,
       framework: null,
     };

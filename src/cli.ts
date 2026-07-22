@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 
+import { join } from "node:path";
 import { cac } from "cac";
 import chalk from "chalk";
 import ora from "ora";
+import fs from "fs-extra";
+import { confirm } from "@inquirer/prompts";
 import { scanRepo } from "./scanner/index.js";
+import { generateDockerfile } from "./generators/generate-dockerfile.js";
+import { selectPrimaryTarget } from "./generators/select-target.js";
 
 const cli = cac("portus");
 
@@ -38,6 +43,36 @@ cli.command("init", "Initialize a Docker project").action(async () => {
       : chalk.dim(" [no framework detected]");
     console.log(`  ${chalk.green("-")} ${pkg.name}${tag}${frameworkLabel}`);
   }
+
+  const target = selectPrimaryTarget(result);
+  if (!target) {
+    console.log();
+    console.log(chalk.red("No package.json found to generate a Dockerfile for."));
+    return;
+  }
+
+  const dockerfileContent = generateDockerfile({
+    packageManager: result.packageManager,
+    runtime: result.runtime,
+    target,
+  });
+
+  const dockerfilePath = join(target.path, "Dockerfile");
+
+  if (await fs.pathExists(dockerfilePath)) {
+    const overwrite = await confirm({
+      message: `Dockerfile already exists at ${dockerfilePath}. Overwrite?`,
+      default: false,
+    });
+    if (!overwrite) {
+      console.log(chalk.yellow("Skipped writing Dockerfile."));
+      return;
+    }
+  }
+
+  await fs.writeFile(dockerfilePath, dockerfileContent);
+  console.log();
+  console.log(chalk.green(`Dockerfile written to ${dockerfilePath}`));
 });
 
 cli.help();

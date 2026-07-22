@@ -18,6 +18,7 @@ export interface FrameworkRule {
   category: FrameworkCategory;
   matchDependencies: string[];
   port?: number;
+  buildOutputDir?: string;
 }
 
 export interface FrameworkMatch {
@@ -25,6 +26,7 @@ export interface FrameworkMatch {
   displayName: string;
   category: FrameworkCategory;
   port?: number;
+  buildOutputDir?: string;
 }
 
 export interface PackageInfo {
@@ -33,6 +35,7 @@ export interface PackageInfo {
   packageJsonPath: string;
   dependencies: Record<string, string>;
   devDependencies: Record<string, string>;
+  scripts: Record<string, string>;
   isRoot: boolean;
   framework: FrameworkMatch | null;
 }

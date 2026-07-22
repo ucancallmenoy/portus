@@ -14,6 +14,7 @@ export function detectFramework(pkg: PackageInfo): FrameworkMatch | null {
         displayName: rule.displayName,
         category: rule.category,
         ...(rule.port !== undefined ? { port: rule.port } : {}),
+        ...(rule.buildOutputDir !== undefined ? { buildOutputDir: rule.buildOutputDir } : {}),
       };
     }
   }
