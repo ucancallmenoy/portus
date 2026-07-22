@@ -28,7 +28,10 @@ cli.command("init", "Initialize a Docker project").action(async () => {
   console.log(chalk.bold("Packages found:"), result.monorepo.packages.length);
   for (const pkg of result.monorepo.packages) {
     const tag = pkg.isRoot ? chalk.dim(" (root)") : "";
-    console.log(`  ${chalk.green("-")} ${pkg.name}${tag}`);
+    const frameworkLabel = pkg.framework
+      ? chalk.magenta(` [${pkg.framework.displayName}]`)
+      : chalk.dim(" [no framework detected]");
+    console.log(`  ${chalk.green("-")} ${pkg.name}${tag}${frameworkLabel}`);
   }
 });
 

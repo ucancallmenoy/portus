@@ -3,6 +3,7 @@ import fs from "fs-extra";
 import { detectPackageManager } from "./package-manager.js";
 import { detectWorkspaces } from "./workspaces.js";
 import { findPackages } from "./find-packages.js";
+import { detectFramework } from "./detect-framework.js";
 import type { ScanResult } from "../types.js";
 
 export async function scanRepo(rootDir: string): Promise<ScanResult> {
@@ -14,6 +15,10 @@ export async function scanRepo(rootDir: string): Promise<ScanResult> {
   const packageManager = detectPackageManager(rootDir);
   const workspaceConfig = detectWorkspaces(rootDir, rootPackageJson);
   const packages = await findPackages(rootDir, workspaceConfig.patterns);
+
+  for (const pkg of packages) {
+    pkg.framework = detectFramework(pkg);
+  }
 
   return {
     root: rootDir,

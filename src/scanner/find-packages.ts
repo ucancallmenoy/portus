@@ -22,6 +22,7 @@ async function readPackageInfo(
       dependencies: raw.dependencies ?? {},
       devDependencies: raw.devDependencies ?? {},
       isRoot,
+      framework: null,
     };
   } catch {
     return null;

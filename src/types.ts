@@ -1,5 +1,22 @@
 export type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
 
+export type FrameworkCategory = "frontend" | "backend" | "fullstack" | "static";
+
+export interface FrameworkRule {
+  id: string;
+  displayName: string;
+  category: FrameworkCategory;
+  matchDependencies: string[];
+  port?: number;
+}
+
+export interface FrameworkMatch {
+  id: string;
+  displayName: string;
+  category: FrameworkCategory;
+  port?: number;
+}
+
 export interface PackageInfo {
   name: string;
   path: string;
@@ -7,6 +24,7 @@ export interface PackageInfo {
   dependencies: Record<string, string>;
   devDependencies: Record<string, string>;
   isRoot: boolean;
+  framework: FrameworkMatch | null;
 }
 
 export interface WorkspaceConfig {
