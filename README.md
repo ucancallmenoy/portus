@@ -2,6 +2,10 @@
 
 A Docker scaffolding for Node.js projects. Portus scans your project, detects your package manager, runtime, and framework, and generates a production-ready `Dockerfile`, `.dockerignore`, and `docker-compose.yaml` tailored to what it finds.
 
+## Requirements
+
+Node.js 18 or later to run Portus itself. Docker is required separately to build and run the generated `Dockerfile` and `docker-compose.yaml`.
+
 ## Installation
 
 ```bash
@@ -54,6 +58,7 @@ portus doctor
 | `portus init -y, --yes` | Same as `init`, without overwrite confirmation prompts |
 | `portus scan` | Report detected package manager, runtime, monorepo structure, and framework without writing files |
 | `portus doctor` | Analyze existing Docker configuration and report issues |
+| `portus --version` | Check the installed version |
 
 ## What gets detected
 
@@ -76,15 +81,19 @@ Built from Nuxt's `.output` directory, which is self-contained by default.
 Branched by adapter, detected from `svelte.config.*`. `adapter-node` produces a Node-runnable image with production-only dependencies. `adapter-static` produces a static image served by nginx. Other adapters (Vercel, Netlify, Cloudflare, auto) fall back to a generic build.
 
 **Remix**
-Generic production build with a dedicated production-dependency stage.
+Adapter detected from installed packages. `@remix-run/serve` (the Node default) gets a production build with a dedicated production-dependency stage. Vercel, Cloudflare, and Deno adapters target non-Node runtimes; Portus still generates a Node-based build for these but prints a warning, since it will likely not run as-is on those platforms.
 
 **Express, Fastify, Koa, Hono, NestJS**
 If a build script is present, a dedicated build stage compiles the project and only production dependencies are installed for the runtime image. Without a build step, only a production install runs, with no unnecessary dev-dependency stage.
 
 **React, Vue, Svelte, Create React App, Angular, Astro**
-Built and served as static assets from nginx, using each framework's known build output directory.
+Built and served as static assets from nginx. For Angular, the output directory is read directly from `angular.json` rather than assumed, since Angular's build output path varies by project name and CLI version.
 
 Every generated Node-based runtime image runs as a non-root user by default.
+
+## Warnings
+
+`portus init` prints a warning after generation when it isn't fully confident the generated Dockerfile will work as-is — for example, a SvelteKit or Remix adapter that targets a non-Node platform, or an Angular project where `angular.json` couldn't be read. These cases still produce a Dockerfile, but it's worth reviewing manually before deploying.
 
 ## Docker configuration output
 
