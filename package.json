@@ -1,6 +1,6 @@
 {
   "name": "portus",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "A Docker scaffolding for Node.js projects — scans your project and generates a production-ready Dockerfile, .dockerignore, and docker-compose.yaml.",
   "type": "module",
   "files": [
@@ -17,7 +17,15 @@
     "format": "prettier --write .",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["docker", "dockerfile", "cli", "scaffolding", "devops", "nextjs", "docker-compose"],
+  "keywords": [
+    "docker",
+    "dockerfile",
+    "cli",
+    "scaffolding",
+    "devops",
+    "nextjs",
+    "docker-compose"
+  ],
   "author": "Patrick Perez",
   "repository": {
     "type": "git",
