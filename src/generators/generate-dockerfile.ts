@@ -20,6 +20,10 @@ function corepackLines(packageManager: PackageManager): string[] {
   return [];
 }
 
+function nonRootUserLines(): string[] {
+  return ["RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 appuser"];
+}
+
 function lockfileGlob(packageManager: PackageManager): string {
   return getPackageManagerCommands(packageManager).lockfile;
 }
@@ -99,7 +103,9 @@ function generateNuxtDockerfile(options: DockerfileOptions): string {
     "FROM base AS runner",
     "WORKDIR /app",
     "ENV NODE_ENV=production",
-    "COPY --from=builder /app/.output ./.output",
+    ...nonRootUserLines(),
+    "COPY --from=builder --chown=appuser:nodejs /app/.output ./.output",
+    "USER appuser",
     `EXPOSE ${port}`,
     'CMD ["node", ".output/server/index.mjs"]',
     "",
@@ -126,9 +132,11 @@ function generateSvelteKitNodeDockerfile(options: DockerfileOptions): string {
     "FROM base AS runner",
     "WORKDIR /app",
     "ENV NODE_ENV=production",
-    "COPY --from=prod-deps /app/node_modules ./node_modules",
-    "COPY --from=builder /app/build ./build",
-    "COPY --from=builder /app/package.json ./package.json",
+    ...nonRootUserLines(),
+    "COPY --from=prod-deps --chown=appuser:nodejs /app/node_modules ./node_modules",
+    "COPY --from=builder --chown=appuser:nodejs /app/build ./build",
+    "COPY --from=builder --chown=appuser:nodejs /app/package.json ./package.json",
+    "USER appuser",
     `EXPOSE ${port}`,
     'CMD ["node", "build/index.js"]',
     "",
@@ -197,9 +205,11 @@ function generateFullstackDockerfile(options: DockerfileOptions): string {
     "FROM base AS runner",
     "WORKDIR /app",
     "ENV NODE_ENV=production",
-    "COPY --from=builder /app ./",
+    ...nonRootUserLines(),
+    "COPY --from=builder --chown=appuser:nodejs /app ./",
     "RUN rm -rf node_modules",
-    "COPY --from=prod-deps /app/node_modules ./node_modules",
+    "COPY --from=prod-deps --chown=appuser:nodejs /app/node_modules ./node_modules",
+    "USER appuser",
     `EXPOSE ${port}`,
     `CMD ["${packageManager}", "run", "${startScript}"]`,
     "",
@@ -227,9 +237,11 @@ function generateBackendDockerfile(options: DockerfileOptions): string {
       "FROM base AS runner",
       "WORKDIR /app",
       "ENV NODE_ENV=production",
-      "COPY --from=prod-deps /app/node_modules ./node_modules",
-      "COPY --from=builder /app/dist ./dist",
-      "COPY package.json ./",
+      ...nonRootUserLines(),
+      "COPY --from=prod-deps --chown=appuser:nodejs /app/node_modules ./node_modules",
+      "COPY --from=builder --chown=appuser:nodejs /app/dist ./dist",
+      "COPY --chown=appuser:nodejs package.json ./",
+      "USER appuser",
       `EXPOSE ${port}`,
       `CMD ["${packageManager}", "run", "start"]`,
       "",
@@ -244,8 +256,10 @@ function generateBackendDockerfile(options: DockerfileOptions): string {
       "FROM base AS runner",
       "WORKDIR /app",
       "ENV NODE_ENV=production",
-      "COPY --from=prod-deps /app/node_modules ./node_modules",
-      "COPY . .",
+      ...nonRootUserLines(),
+      "COPY --from=prod-deps --chown=appuser:nodejs /app/node_modules ./node_modules",
+      "COPY --chown=appuser:nodejs . .",
+      "USER appuser",
       `EXPOSE ${port}`,
       hasScript(target, "start")
         ? `CMD ["${packageManager}", "run", "start"]`
