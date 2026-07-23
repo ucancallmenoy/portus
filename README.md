@@ -1,85 +1,115 @@
 # Portus
 
-> Intelligent Docker scaffolding for modern applications.
-
-Portus is a CLI that analyzes your project and generates an optimized Docker setup. It detects your project's package manager, runtime, and framework, then produces a production-ready `Dockerfile` tailored to what it finds, instead of you writing one by hand for every project.
+Intelligent Docker scaffolding for Node.js projects. Portus scans your project, detects your package manager, runtime, and framework, and generates a production-ready `Dockerfile`, `.dockerignore`, and `docker-compose.yaml` tailored to what it finds.
 
 ## Installation
 
 ```bash
-pnpm install
+npm install -g portus
 ```
 
-## Development
-
-Start the CLI in development mode:
-
 ```bash
-pnpm dev
+pnpm add -g portus
 ```
 
-Build the project:
-
 ```bash
-pnpm build
-```
-
-Run the compiled CLI:
-
-```bash
-pnpm start
+yarn global add portus
 ```
 
 ## Usage
 
-From inside a project (single repo or monorepo):
+Generate Docker configuration for the current project:
 
 ```bash
 portus init
 ```
 
-This scans the repository, prints a summary of what was detected, and writes a `Dockerfile` for the primary target package. If a `Dockerfile` already exists at that location, you will be asked to confirm before it is overwritten.
+This scans the repository, prints what was detected, and writes a `Dockerfile`, `.dockerignore`, and `docker-compose.yaml`. If any of these files already exist, you will be prompted before they are overwritten.
 
-## What it detects
+Skip overwrite prompts (useful in CI or when re-running repeatedly):
 
-**Package manager** — resolved from lockfiles (`pnpm-lock.yaml`, `yarn.lock`, `bun.lockb`, `package-lock.json`), defaulting to npm if none are found.
+```bash
+portus init --yes
+```
 
-**Runtime** — Node or Bun, with a Node version resolved from `engines.node` in `package.json`, then `.nvmrc`, then `.node-version`, falling back to a default LTS version if none are specified.
+Preview what Portus detects without writing any files:
 
-**Monorepo structure** — workspace packages are resolved from `pnpm-workspace.yaml`, `package.json#workspaces`, or `lerna.json`, in that priority order. Turborepo and Nx are recognized as build orchestrators layered on top of a workspace definition, not as workspace sources themselves.
+```bash
+portus scan
+```
 
-**Framework** — each `package.json` found (root and, in a monorepo, every workspace package) is classified against an ordered set of rules, from most specific to least specific, so that meta-frameworks (Next.js, Nuxt, SvelteKit, Remix) are correctly distinguished from the underlying libraries they depend on (React, Vue, Svelte).
+Analyze an existing Docker setup for common issues:
 
-## Dockerfile generation
+```bash
+portus doctor
+```
 
-Generation branches by framework category:
+`doctor` exits with a non-zero status code when errors are found, so it can be used as a CI check.
 
-- **Fullstack** (Next.js, Nuxt, SvelteKit, Remix) — multi-stage build tailored to the framework's actual output shape where that shape is reliably detectable:
-  - Next.js with `output: "standalone"` set in `next.config.*` gets a minimal runtime image built from `.next/standalone`, with no `node_modules` copied at all.
-  - Nuxt is built from its `.output` directory, which is self-contained by default.
-  - SvelteKit is branched by adapter (detected from `svelte.config.*`): `adapter-node` produces a Node-runnable image, `adapter-static` produces an nginx-served static image. Other adapters (Vercel, Netlify, Cloudflare, auto) fall back to the generic path below, since their actual output targets a different runtime than a plain container.
-  - Everything else in this category uses a generic path: the built app is copied forward, its development `node_modules` are removed, and a production-only `node_modules` (installed in a parallel stage) is copied in its place.
+## Commands
 
-- **Backend** (Express, Fastify, Koa, Hono, NestJS) — if a `build` script exists, a dedicated build stage compiles the project and only production dependencies are installed for the runtime stage. If there is no build step, the dev-dependency install stage is skipped entirely and only a production install runs.
+| Command | Description |
+| --- | --- |
+| `portus init` | Scan the project and generate `Dockerfile`, `.dockerignore`, and `docker-compose.yaml` |
+| `portus init -y, --yes` | Same as `init`, without overwrite confirmation prompts |
+| `portus scan` | Report detected package manager, runtime, monorepo structure, and framework without writing files |
+| `portus doctor` | Analyze existing Docker configuration and report issues |
 
-- **Frontend / static** (React, Vue, Svelte, Create React App, Angular, Astro) — built with the appropriate output directory per framework, then served from `nginx:alpine`. Angular's actual output path can vary by project name and version; this is a known limitation and may need manual adjustment.
+## What gets detected
 
-Framework-specific output detectors (currently: Next.js standalone mode, SvelteKit adapter) live together in a single file rather than one file per framework, so that framework support does not read as favoring any one framework.
+- **Package manager** — resolved from lockfiles (pnpm, yarn, bun, npm), defaulting to npm if none are found.
+- **Runtime and version** — Node or Bun, with the Node version resolved from `engines.node`, `.nvmrc`, or `.node-version`, in that order.
+- **Monorepo structure** — workspace packages resolved from `pnpm-workspace.yaml`, `package.json#workspaces`, or `lerna.json`. Turborepo and Nx are recognized as build orchestrators.
+- **Framework** — classified per package from an ordered rule set, so meta-frameworks are correctly distinguished from the libraries underneath them.
 
+## Framework support
 
-## Current status
+Portus generates a tailored, production-optimized Dockerfile depending on the framework it detects:
 
-Portus can scan a single repo or monorepo, detect package manager, runtime, and framework per package, and generate a working, reasonably optimized `Dockerfile` for the most common Node frameworks and backend setups.
+**Next.js**
+With `output: "standalone"` set in `next.config.*`, Portus builds a minimal runtime image from `.next/standalone`, with no `node_modules` in the final image at all. Without standalone output configured, it falls back to a production-dependency-only build.
 
-## Roadmap
+**Nuxt**
+Built from Nuxt's `.output` directory, which is self-contained by default.
 
-- [x] CLI foundation
-- [x] Project detection (package manager, runtime, monorepo structure, framework)
-- [x] Dockerfile generation
-- [ ] `.dockerignore` generation
-- [ ] `docker-compose.yml` generation
-- [ ] Docker configuration analysis (`doctor`)
-- [ ] Additional framework-specific optimizations (Remix adapter detection, Angular output path resolution)
+**SvelteKit**
+Branched by adapter, detected from `svelte.config.*`. `adapter-node` produces a Node-runnable image with production-only dependencies. `adapter-static` produces a static image served by nginx. Other adapters (Vercel, Netlify, Cloudflare, auto) fall back to a generic build.
+
+**Remix**
+Generic production build with a dedicated production-dependency stage.
+
+**Express, Fastify, Koa, Hono, NestJS**
+If a build script is present, a dedicated build stage compiles the project and only production dependencies are installed for the runtime image. Without a build step, only a production install runs, with no unnecessary dev-dependency stage.
+
+**React, Vue, Svelte, Create React App, Angular, Astro**
+Built and served as static assets from nginx, using each framework's known build output directory.
+
+Every generated Node-based runtime image runs as a non-root user by default.
+
+## Docker configuration output
+
+**Dockerfile**
+Multi-stage where applicable, with a parallel production-only dependency install stage swapped into the final image so development dependencies never ship to production. Base images are pinned to a specific version tag.
+
+**.dockerignore**
+A solid baseline (`node_modules`, `.git`, environment files, editor directories, logs) plus the detected framework's build output directory, so stale local build artifacts and generated files are never sent to the Docker build context.
+
+**docker-compose.yaml**
+A service definition with the correct build context, port mapping based on the detected framework's default port, a restart policy, and an `env_file` reference if a `.env` file is present.
+
+## Doctor checks
+
+`portus doctor` analyzes an existing Dockerfile, `.dockerignore`, and `docker-compose.yaml` for:
+
+- Missing files
+- Single-stage builds
+- Unpinned or `:latest` base image tags
+- Missing non-root `USER` instruction
+- Dependency installs running after `COPY . .`, which defeats layer caching
+- Possible hardcoded secrets in `ENV` or `ARG` instructions
+- Missing `EXPOSE` instruction
+- Missing recommended `.dockerignore` entries
+- Invalid or incomplete `docker-compose.yaml` structure, including missing restart policies or port mappings
 
 ## License
 

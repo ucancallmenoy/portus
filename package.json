@@ -1,9 +1,11 @@
 {
   "name": "portus",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "A Docker scaffolding for Node.js projects — scans your project and generates a production-ready Dockerfile, .dockerignore, and docker-compose.yaml.",
   "type": "module",
+  "files": [
+    "dist"
+  ],
   "bin": {
     "portus": "./dist/cli.js"
   },
@@ -12,11 +14,19 @@
     "build": "tsc",
     "start": "node dist/cli.js",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "prepublishOnly": "pnpm build"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["docker", "dockerfile", "cli", "scaffolding", "devops", "nextjs", "docker-compose"],
+  "author": "Patrick Perez",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ucancallmenoy/portus.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
