@@ -8,71 +8,119 @@ import fs from "fs-extra";
 import { confirm } from "@inquirer/prompts";
 import { scanRepo } from "./scanner/index.js";
 import { generateDockerfile } from "./generators/generate-dockerfile.js";
+import { generateDockerignore } from "./generators/generate-dockerignore.js";
+import { generateDockerCompose } from "./generators/generate-docker-compose.js";
 import { selectPrimaryTarget } from "./generators/select-target.js";
+import { runDoctor } from "./doctor/index.js";
+import { printScanSummary } from "./cli-output.js";
 
 const cli = cac("portus");
 
-cli.command("init", "Initialize a Docker project").action(async () => {
-  console.log(chalk.cyan("🚢 Portus"));
+async function writeGeneratedFile(
+  filePath: string,
+  content: string,
+  label: string,
+  skipConfirm: boolean,
+): Promise<void> {
+  if (!skipConfirm && (await fs.pathExists(filePath))) {
+    const overwrite = await confirm({
+      message: `${label} already exists at ${filePath}. Overwrite?`,
+      default: false,
+    });
+    if (!overwrite) {
+      console.log(chalk.yellow(`Skipped writing ${label}.`));
+      return;
+    }
+  }
+  await fs.writeFile(filePath, content);
+  console.log(chalk.green(`${label} written to ${filePath}`));
+}
+
+cli
+  .command("init", "Initialize a Docker project")
+  .option("-y, --yes", "Overwrite existing files without prompting")
+  .action(async (options: { yes?: boolean }) => {
+    console.log(chalk.cyan("Portus"));
+
+    const spinner = ora("Scanning repository...").start();
+    const result = await scanRepo(process.cwd());
+    spinner.succeed("Scan complete");
+
+    printScanSummary(result);
+
+    const target = selectPrimaryTarget(result);
+    if (!target) {
+      console.log();
+      console.log(chalk.red("No package.json found to generate Docker config for."));
+      return;
+    }
+
+    const dockerfileContent = generateDockerfile({
+      packageManager: result.packageManager,
+      runtime: result.runtime,
+      target,
+    });
+    const dockerignoreContent = generateDockerignore(target);
+    const dockerComposeContent = generateDockerCompose(result, target);
+    const skipConfirm = options.yes ?? false;
+
+    console.log();
+    await writeGeneratedFile(join(target.path, "Dockerfile"), dockerfileContent, "Dockerfile", skipConfirm);
+    await writeGeneratedFile(join(target.path, ".dockerignore"), dockerignoreContent, ".dockerignore", skipConfirm);
+    await writeGeneratedFile(
+      join(result.root, "docker-compose.yaml"),
+      dockerComposeContent,
+      "docker-compose.yaml",
+      skipConfirm,
+    );
+  });
+
+cli.command("scan", "Scan the repository and report detected setup without writing files").action(async () => {
+  console.log(chalk.cyan("Portus"));
 
   const spinner = ora("Scanning repository...").start();
   const result = await scanRepo(process.cwd());
   spinner.succeed("Scan complete");
 
+  printScanSummary(result);
+});
+
+cli.command("doctor", "Analyze existing Docker configuration for issues").action(async () => {
+  const spinner = ora("Analyzing Docker configuration...").start();
+  const reports = await runDoctor(process.cwd());
+  spinner.succeed("Analysis complete");
+
   console.log();
-  console.log(chalk.bold("Package manager:"), result.packageManager);
-  console.log(
-    chalk.bold("Runtime:"),
-    `${result.runtime.runtime} ${result.runtime.nodeVersion}`,
-    chalk.dim(`(${result.runtime.source})`),
-  );
-  console.log(chalk.bold("Monorepo:"), result.monorepo.isMonorepo ? "yes" : "no");
+  let errorCount = 0;
+  let warningCount = 0;
 
-  if (result.monorepo.isMonorepo) {
-    console.log(chalk.bold("Workspace source:"), result.monorepo.workspaceSource);
-    if (result.monorepo.orchestrator) {
-      console.log(chalk.bold("Orchestrator:"), result.monorepo.orchestrator);
+  for (const report of reports) {
+    console.log(chalk.bold(report.file));
+    if (report.issues.length === 0) {
+      console.log(`  ${chalk.green("OK")} No issues found.`);
     }
-  }
-
-  console.log(chalk.bold("Packages found:"), result.monorepo.packages.length);
-  for (const pkg of result.monorepo.packages) {
-    const tag = pkg.isRoot ? chalk.dim(" (root)") : "";
-    const frameworkLabel = pkg.framework
-      ? chalk.magenta(` [${pkg.framework.displayName}]`)
-      : chalk.dim(" [no framework detected]");
-    console.log(`  ${chalk.green("-")} ${pkg.name}${tag}${frameworkLabel}`);
-  }
-
-  const target = selectPrimaryTarget(result);
-  if (!target) {
+    for (const issue of report.issues) {
+      if (issue.severity === "error") {
+        errorCount += 1;
+        console.log(`  ${chalk.red("ERROR")} ${issue.message}`);
+      } else if (issue.severity === "warning") {
+        warningCount += 1;
+        console.log(`  ${chalk.yellow("WARN")} ${issue.message}`);
+      } else {
+        console.log(`  ${chalk.dim("INFO")} ${issue.message}`);
+      }
+    }
     console.log();
-    console.log(chalk.red("No package.json found to generate a Dockerfile for."));
-    return;
   }
 
-  const dockerfileContent = generateDockerfile({
-    packageManager: result.packageManager,
-    runtime: result.runtime,
-    target,
-  });
-
-  const dockerfilePath = join(target.path, "Dockerfile");
-
-  if (await fs.pathExists(dockerfilePath)) {
-    const overwrite = await confirm({
-      message: `Dockerfile already exists at ${dockerfilePath}. Overwrite?`,
-      default: false,
-    });
-    if (!overwrite) {
-      console.log(chalk.yellow("Skipped writing Dockerfile."));
-      return;
-    }
+  if (errorCount > 0) {
+    console.log(chalk.red(`${errorCount} error(s), ${warningCount} warning(s) found.`));
+    process.exitCode = 1;
+  } else if (warningCount > 0) {
+    console.log(chalk.yellow(`${warningCount} warning(s) found.`));
+  } else {
+    console.log(chalk.green("All checks passed."));
   }
-
-  await fs.writeFile(dockerfilePath, dockerfileContent);
-  console.log();
-  console.log(chalk.green(`Dockerfile written to ${dockerfilePath}`));
 });
 
 cli.help();
