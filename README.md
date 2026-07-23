@@ -1,6 +1,6 @@
 # Portus
 
-Intelligent Docker scaffolding for Node.js projects. Portus scans your project, detects your package manager, runtime, and framework, and generates a production-ready `Dockerfile`, `.dockerignore`, and `docker-compose.yaml` tailored to what it finds.
+A Docker scaffolding for Node.js projects. Portus scans your project, detects your package manager, runtime, and framework, and generates a production-ready `Dockerfile`, `.dockerignore`, and `docker-compose.yaml` tailored to what it finds.
 
 ## Installation
 
