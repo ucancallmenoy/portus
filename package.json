@@ -1,6 +1,6 @@
 {
   "name": "portus",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A Docker scaffolding for Node.js projects — scans your project and generates a production-ready Dockerfile, .dockerignore, and docker-compose.yaml.",
   "type": "module",
   "files": [
