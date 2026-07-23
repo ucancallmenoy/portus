@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { cac } from "cac";
 import chalk from "chalk";
 import ora from "ora";
@@ -14,7 +16,12 @@ import { selectPrimaryTarget } from "./generators/select-target.js";
 import { runDoctor } from "./doctor/index.js";
 import { printScanSummary } from "./cli-output.js";
 
+const currentDir = fileURLToPath(new URL(".", import.meta.url));
+const packageJsonPath = join(currentDir, "..", "package.json");
+const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8")) as { version: string };
+
 const cli = cac("portus");
+cli.version(packageJson.version);
 
 async function writeGeneratedFile(
   filePath: string,
