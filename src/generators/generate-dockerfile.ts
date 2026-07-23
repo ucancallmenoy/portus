@@ -1,12 +1,22 @@
 import type { PackageInfo, PackageManager, RuntimeInfo } from "../types.js";
 import { getPackageManagerCommands } from "./package-manager-commands.js";
 import { getBaseImage } from "./base-image.js";
-import { detectNextStandalone, detectSvelteKitAdapter } from "./detectors/detect-framework-output.js";
+import {
+  detectNextStandalone,
+  detectSvelteKitAdapter,
+  detectRemixAdapter,
+  detectAngularOutputDir,
+} from "./detectors/detect-framework-output.js";
 
 export interface DockerfileOptions {
   packageManager: PackageManager;
   runtime: RuntimeInfo;
   target: PackageInfo;
+}
+
+export interface DockerfileResult {
+  content: string;
+  warnings: string[];
 }
 
 function hasScript(target: PackageInfo, script: string): boolean {
@@ -165,27 +175,8 @@ function generateSvelteKitStaticDockerfile(options: DockerfileOptions): string {
   ].join("\n");
 }
 
-function generateFullstackDockerfile(options: DockerfileOptions): string {
+function generateGenericFullstackDockerfile(options: DockerfileOptions): string {
   const { packageManager, runtime, target } = options;
-
-  if (target.framework && target.framework.id === "nextjs" && detectNextStandalone(target.path)) {
-    return generateNextStandaloneDockerfile(options);
-  }
-
-  if (target.framework && target.framework.id === "nuxt") {
-    return generateNuxtDockerfile(options);
-  }
-
-  if (target.framework && target.framework.id === "sveltekit") {
-    const adapter = detectSvelteKitAdapter(target.path);
-    if (adapter === "node") {
-      return generateSvelteKitNodeDockerfile(options);
-    }
-    if (adapter === "static") {
-      return generateSvelteKitStaticDockerfile(options);
-    }
-  }
-
   const baseImage = getBaseImage(runtime);
   const commands = getPackageManagerCommands(packageManager);
   const port = target.framework?.port ?? 3000;
@@ -214,6 +205,45 @@ function generateFullstackDockerfile(options: DockerfileOptions): string {
     `CMD ["${packageManager}", "run", "${startScript}"]`,
     "",
   ].join("\n");
+}
+
+function generateFullstackDockerfile(options: DockerfileOptions): { content: string; warnings: string[] } {
+  const { target } = options;
+  const warnings: string[] = [];
+
+  if (target.framework && target.framework.id === "nextjs" && detectNextStandalone(target.path)) {
+    return { content: generateNextStandaloneDockerfile(options), warnings };
+  }
+
+  if (target.framework && target.framework.id === "nuxt") {
+    return { content: generateNuxtDockerfile(options), warnings };
+  }
+
+  if (target.framework && target.framework.id === "sveltekit") {
+    const adapter = detectSvelteKitAdapter(target.path);
+    if (adapter === "node") {
+      return { content: generateSvelteKitNodeDockerfile(options), warnings };
+    }
+    if (adapter === "static") {
+      return { content: generateSvelteKitStaticDockerfile(options), warnings };
+    }
+    warnings.push(
+      `SvelteKit adapter "${adapter}" was detected. This does not produce a plain Node-runnable server, so the generated Dockerfile uses a generic Node build and may not run correctly. Consider @sveltejs/adapter-node for containerized deployments.`,
+    );
+    return { content: generateGenericFullstackDockerfile(options), warnings };
+  }
+
+  if (target.framework && target.framework.id === "remix") {
+    const adapter = detectRemixAdapter(target);
+    if (adapter === "vercel" || adapter === "cloudflare" || adapter === "deno") {
+      warnings.push(
+        `Remix adapter "${adapter}" targets a non-Node runtime or platform. The generated Dockerfile assumes a Node server and will likely not work as-is for this deployment target.`,
+      );
+    }
+    return { content: generateGenericFullstackDockerfile(options), warnings };
+  }
+
+  return { content: generateGenericFullstackDockerfile(options), warnings };
 }
 
 function generateBackendDockerfile(options: DockerfileOptions): string {
@@ -271,13 +301,26 @@ function generateBackendDockerfile(options: DockerfileOptions): string {
   return lines.join("\n");
 }
 
-function generateStaticDockerfile(options: DockerfileOptions): string {
+function generateStaticDockerfile(options: DockerfileOptions): { content: string; warnings: string[] } {
   const { packageManager, runtime, target } = options;
   const baseImage = getBaseImage(runtime);
   const commands = getPackageManagerCommands(packageManager);
-  const outputDir = target.framework?.buildOutputDir ?? "dist";
+  const warnings: string[] = [];
 
-  return [
+  let outputDir = target.framework?.buildOutputDir ?? "dist";
+
+  if (target.framework?.id === "angular") {
+    const angularOutputDir = detectAngularOutputDir(target.path);
+    if (angularOutputDir) {
+      outputDir = angularOutputDir;
+    } else {
+      warnings.push(
+        `Could not read angular.json to determine the build output path. Assuming "${outputDir}" — verify this matches your project's actual output directory.`,
+      );
+    }
+  }
+
+  const content = [
     `FROM ${baseImage} AS builder`,
     ...corepackLines(packageManager),
     "WORKDIR /app",
@@ -292,9 +335,11 @@ function generateStaticDockerfile(options: DockerfileOptions): string {
     'CMD ["nginx", "-g", "daemon off;"]',
     "",
   ].join("\n");
+
+  return { content, warnings };
 }
 
-export function generateDockerfile(options: DockerfileOptions): string {
+export function generateDockerfile(options: DockerfileOptions): DockerfileResult {
   const category = options.target.framework?.category ?? "backend";
 
   switch (category) {
@@ -305,6 +350,6 @@ export function generateDockerfile(options: DockerfileOptions): string {
       return generateStaticDockerfile(options);
     case "backend":
     default:
-      return generateBackendDockerfile(options);
+      return { content: generateBackendDockerfile(options), warnings: [] };
   }
 }

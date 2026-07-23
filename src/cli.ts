@@ -55,7 +55,7 @@ cli
       return;
     }
 
-    const dockerfileContent = generateDockerfile({
+    const dockerfileResult = generateDockerfile({
       packageManager: result.packageManager,
       runtime: result.runtime,
       target,
@@ -65,7 +65,7 @@ cli
     const skipConfirm = options.yes ?? false;
 
     console.log();
-    await writeGeneratedFile(join(target.path, "Dockerfile"), dockerfileContent, "Dockerfile", skipConfirm);
+    await writeGeneratedFile(join(target.path, "Dockerfile"), dockerfileResult.content, "Dockerfile", skipConfirm);
     await writeGeneratedFile(join(target.path, ".dockerignore"), dockerignoreContent, ".dockerignore", skipConfirm);
     await writeGeneratedFile(
       join(result.root, "docker-compose.yaml"),
@@ -73,6 +73,13 @@ cli
       "docker-compose.yaml",
       skipConfirm,
     );
+
+    if (dockerfileResult.warnings.length > 0) {
+      console.log();
+      for (const warning of dockerfileResult.warnings) {
+        console.log(`${chalk.yellow("WARN")} ${warning}`);
+      }
+    }
   });
 
 cli.command("scan", "Scan the repository and report detected setup without writing files").action(async () => {
